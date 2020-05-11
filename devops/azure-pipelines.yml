@@ -1,0 +1,96 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  branches:
+    include:
+      - master
+  paths:
+    include:
+      - notebooks/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  jobs:
+  - job: BuildJob
+    steps:
+    
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(system.defaultworkingdirectory)/notebooks'
+        Contents: '**'
+        TargetFolder: '$(build.artifactstagingdirectory)'
+      
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact: Notebooks'
+      inputs:
+        PathtoPublish: '$(build.artifactstagingdirectory)'
+        ArtifactName: 'Notebooks'
+        publishLocation: 'Container'
+
+- stage: ReleaseQA
+  jobs:
+  - job: DeployInfra
+    steps:
+    - checkout: self
+    
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: 'ls'
+    
+    - task: AzureResourceManagerTemplateDeployment@3
+      inputs:
+        deploymentScope: 'Resource Group'
+        azureResourceManagerConnection: $(resourceConnection)
+        subscriptionId: $(subscriptionId)
+        action: 'Create Or Update Resource Group'
+        resourceGroupName: 'sparkdevops'
+        location: 'East US 2'
+        templateLocation: 'Linked artifact'
+        csmFile: 'arm-templates/azure-deploy.json'
+        csmParametersFile: 'arm-templates/azuredeploy.parameters.json'
+        overrideParameters: '-kvFirstObjectId $(userObjectIdForKV)'
+        deploymentMode: 'Incremental'
+
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.6'
+        addToPath: true
+        architecture: 'x64'
+
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'Notebooks'
+        downloadPath: '$(System.ArtifactsDirectory)/Notebooks'
+    
+    - task: configuredatabricks@0
+      inputs:
+        url: '$(workspaceURL)'
+        token: '$(databrickstoken)'
+
+    - task: deploynotebooks@0
+      inputs:
+        notebooksFolderPath: '$(System.ArtifactsDirectory)/Notebooks'
+        workspaceFolder: '/Shared'
+    
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          export new_job_id=$(databricks jobs create --json-file notebook.job.json --profile AZDO | jq '.job_id')
+          
+          echo "New Job ID is ($new_job_id)"
+          sleep 10
+          echo "Beginning jobs run"
+          export run_results=$(databricks jobs run-now --job-id $new_job_id --profile AZDO)
+          echo "Displaying results"
+          echo "$run_results"
+          echo "Completed output"

@@ -1,0 +1,109 @@
+# Maven
+# Build your Java project and run tests with Apache Maven.
+# Add steps that analyze code, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/java
+
+trigger:
+  branches:
+    include:
+      - master
+  paths:
+    include:
+      - streamdevops/*
+
+pool:
+  vmImage: 'windows-latest'
+
+stages:
+- stage: Build
+  jobs:
+  - job: BuildJob
+    steps:
+    - task: Maven@3
+      inputs:
+        mavenPomFile: 'streamdevops/pom.xml'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        javaHomeOption: 'JDKVersion'
+        jdkVersionOption: '1.8'
+        mavenVersionOption: 'Default'
+        mavenOptions: '-Xmx3072m'
+        mavenAuthenticateFeed: false
+        effectivePomSkip: false
+        sonarQubeRunAnalysis: false
+    
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: 'ls -R'
+    
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(system.defaultworkingdirectory)/streamdevops/target/'
+        Contents: '**'
+        TargetFolder: '$(build.artifactstagingdirectory)'
+      
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Artifact: Jars'
+      inputs:
+        PathtoPublish: '$(build.artifactstagingdirectory)'
+        ArtifactName: 'Jars'
+        publishLocation: 'Container'
+    
+- stage: ReleaseQA
+  jobs:
+  - job: DeployInfra
+    steps:
+    - checkout: self
+    
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: 'ls -R'
+
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.6'
+        addToPath: true
+        architecture: 'x64'
+
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'Jars'
+        downloadPath: '$(System.ArtifactsDirectory)/Jars'
+
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: 'ls -R'
+
+    - task: AzureFileCopy@4
+      inputs:
+        SourcePath: '$(System.ArtifactsDirectory)/Jars'
+        azureSubscription: 'WJ AIR(97a44625-84c2-4cba-a587-7d1e95f79a80)'
+        Destination: 'AzureBlob'
+        storage: 'storet2ktfhti4jpnc'
+        ContainerName: 'events'
+        BlobPrefix: 'jars/app01'
+
+    
+    - task: configuredatabricks@0
+      inputs:
+        url: '$(workspaceURL)'
+        token: '$(databrickstoken)'
+
+    - task: Bash@3
+      inputs:
+        targetType: 'inline'
+        script: |
+          export new_job_id=$(databricks jobs create --json-file jar.job.json --profile AZDO | jq '.job_id')
+          
+          echo "New Job ID is ($new_job_id)"
+          sleep 10
+          echo "Beginning jobs run"
+          export run_results=$(databricks jobs run-now --job-id $new_job_id --profile AZDO)
+          echo "Displaying results"
+          echo "$run_results"
+          echo "Completed output"

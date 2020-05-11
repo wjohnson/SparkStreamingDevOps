@@ -1,0 +1,31 @@
+{
+  "name": "Example Job to Run Deployed Jar",
+  "new_cluster": {
+    "spark_version": "6.2.x-scala2.11",
+    "node_type_id": "Standard_DS3_v2",
+    "num_workers": 2
+  },
+  "libraries": [
+    {
+      "jar": "dbfs:/mnt/eventOutput/jars/app01/Jars/Jars/streamdevops-1.0-SNAPSHOT.jar"
+    },
+    {
+      "maven": {
+        "coordinates": "com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.15"
+      }
+    }
+  ],
+  "timeout_seconds": 3600,
+  "max_retries": 1,
+  "spark_jar_task": {
+    "main_class_name": "co.willj.SampleStreamingApp",
+    "parameters": [
+      "myproject",
+      "ehublistenconnstr",
+      "textehub",
+      "sparkconsumer",
+      "/mnt/eventOutput/checkpoints/01/",
+      "/mnt/eventOutput/output/01/"
+    ]
+  }
+}

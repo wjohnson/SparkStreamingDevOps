@@ -1,0 +1,20 @@
+{
+    "name": "WordCount Notebook Job",
+    "new_cluster": {
+      "spark_version": "6.2.x-scala2.11",
+      "node_type_id": "Standard_D3_v2",
+      "num_workers": 2
+    },
+    "libraries": [
+      {
+        "maven": {
+          "coordinates": "com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.15"
+        }
+      }
+    ],
+    "timeout_seconds": 3600,
+    "max_retries": 1,
+    "notebook_task": {
+      "notebook_path": "/Shared/Notebooks/streamwordcount"
+    }
+  }

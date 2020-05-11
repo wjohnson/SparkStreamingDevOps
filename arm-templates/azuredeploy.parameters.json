@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "value": "mydbrworkspace"
+    },
+    "eventHubNamespaceName": {
+      "value": "sparkdevopsehub"
+    },
+    "eventHubName": {
+      "value": "textehub"
+    },
+    "consumerGroupName": {
+      "value": "sparkconsumer"
+    },
+    "keyVaultName": {
+      "value": "sparkdevopsakv"
+    },
+    "kvFirstObjectId": {
+      "value": "{{FIRST_OBJECT_ID}}"
+    }
+  }
+}
